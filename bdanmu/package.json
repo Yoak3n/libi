@@ -1,0 +1,10 @@
+{
+	"devDependencies": {
+		"@vicons/ionicons5": "^0.13.0",
+		"naive-ui": "^2.44.1"
+	},
+	"dependencies": {
+		"pinia": "^3.0.4",
+		"vue-router": "^5.1.0"
+	}
+}
