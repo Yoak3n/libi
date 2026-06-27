@@ -20,23 +20,28 @@ const (
 	replyChanCapacity = 1000
 )
 
+type collectedUser struct {
+	uid    uint
+	medal  *schema.Medal
+}
+
 type Queue struct {
 	DanMu       chan *schema.DanMu
 	UserEntry   chan *schema.UserEntry
-	CollectUser chan uint
+	CollectUser chan collectedUser
 	reply       chan *schema.User
 
 	danmuRepo *implements.DanMuRepository
 	entryRepo *implements.UserEntryRepository
 	emitFunc  func(event string, data ...any) bool
-	getUsers  func(uids []uint) []*schema.User
+	getUsers  func(uids []uint, medals map[uint]*schema.Medal) []*schema.User
 }
 
-func NewQueue(danmuRepo *implements.DanMuRepository, entryRepo *implements.UserEntryRepository, emitFunc func(string, ...any) bool, getUsers func([]uint) []*schema.User) *Queue {
+func NewQueue(danmuRepo *implements.DanMuRepository, entryRepo *implements.UserEntryRepository, emitFunc func(string, ...any) bool, getUsers func([]uint, map[uint]*schema.Medal) []*schema.User) *Queue {
 	return &Queue{
 		DanMu:       make(chan *schema.DanMu, danMuChanCapacity),
 		UserEntry:   make(chan *schema.UserEntry, entryChanCapacity),
-		CollectUser: make(chan uint, entryChanCapacity),
+		CollectUser: make(chan collectedUser, entryChanCapacity),
 		reply:       make(chan *schema.User, replyChanCapacity),
 		danmuRepo:   danmuRepo,
 		entryRepo:   entryRepo,
@@ -121,6 +126,7 @@ func (q *Queue) collectUserEntry() {
 
 func (q *Queue) collectUserId() {
 	pending := make([]uint, 0, userBatchSize)
+	medals := make(map[uint]*schema.Medal, userBatchSize)
 	seen := make(map[uint]struct{}, userBatchSize)
 	timer := time.NewTimer(flushInterval)
 	var flag atomic.Int32
@@ -132,26 +138,29 @@ func (q *Queue) collectUserId() {
 		}
 	}()
 
-	for uid := range q.CollectUser {
-		if _, dup := seen[uid]; dup {
-			continue
+	for cu := range q.CollectUser {
+		if _, dup := seen[cu.uid]; !dup {
+			seen[cu.uid] = struct{}{}
+			pending = append(pending, cu.uid)
 		}
-		seen[uid] = struct{}{}
-		pending = append(pending, uid)
+		if cu.medal != nil {
+			medals[cu.uid] = cu.medal
+		}
 		if flag.Load() > 0 || len(pending) >= userBatchSize {
 			flag.Store(0)
-			go q.processUserBatch(pending)
+			go q.processUserBatch(pending, medals)
 			pending = make([]uint, 0, userBatchSize)
+			medals = make(map[uint]*schema.Medal, userBatchSize)
 			seen = make(map[uint]struct{}, userBatchSize)
 		}
 	}
 }
 
-func (q *Queue) processUserBatch(uids []uint) {
+func (q *Queue) processUserBatch(uids []uint, medals map[uint]*schema.Medal) {
 	if len(uids) == 0 || q.getUsers == nil {
 		return
 	}
-	users := q.getUsers(uids)
+	users := q.getUsers(uids, medals)
 	for _, u := range users {
 		q.sendReply(u)
 	}

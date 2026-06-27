@@ -1,13 +1,13 @@
 <template>
     <div class="danmu-wrapper">
         <div class="danmu">
-            <a class="avatar" href="javascript:void(0)" @click="Browser.OpenURL('https://space.bilibili.com/' + props.danmu.user.uid)">
+            <div class="avatar" @click.prevent.stop="openSpace">
                 <n-avatar round :size="45"
                     :src="props.danmu.user.avatar != '' ? props.danmu.user.avatar : 'https://i0.hdslb.com/bfs/face/member/noface.jpg'"
                     fallback-src="https://i0.hdslb.com/bfs/face/member/noface.jpg"
                     :img-props="{ class: 'avatar-img', alt: props.danmu.user.name }">
                 </n-avatar>
-            </a>
+            </div>
             <div class="content">
                 <div class="info">
                     <div v-if="props.danmu.user.guard" class="fleet"></div>
@@ -36,6 +36,10 @@ const props = defineProps(
     }
 )
 
+function openSpace() {
+    Browser.OpenURL('https://space.bilibili.com/' + props.danmu.user.uid)
+}
+
 
 </script>
 
@@ -63,7 +67,11 @@ const props = defineProps(
             line-height: 100%;
             text-align: center;
             padding-top: 10px;
+            cursor: pointer;
 
+            :deep(.n-avatar), :deep(img) {
+                pointer-events: none;
+            }
         }
 
         .content {

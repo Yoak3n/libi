@@ -55,13 +55,16 @@ onMounted(() => {
 
 <style scoped lang="less">
 .menu {
-  color: rgba(28, 28, 28, 1);
-  background-color: rgba(28, 28, 28, 1);
+  color: transparent;
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .menu:hover {
   animation-duration: .5s;
   animation-name: fadeIn;
+  color: #1c1c1c;
   background-color: rgba(240, 240, 240, 1);
 }
 
@@ -73,7 +76,7 @@ onMounted(() => {
 
 @keyframes fadeIn {
   from {
-    background-color: rgba(28, 28, 28, 0);
+    background-color: rgba(6, 7, 15, 0);
   }
 
   to {

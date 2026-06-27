@@ -1,7 +1,9 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -10,10 +12,13 @@ import (
 
 	"github.com/Yoak3n/libi/shared/config"
 	"github.com/Yoak3n/libi/shared/domain/model/schema"
+	"github.com/Yoak3n/libi/shared/domain/model/table"
+	"github.com/Yoak3n/libi/shared/repository/implements"
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
 
 	"bdanmu/app/dispatch"
+	"bdanmu/app/runtime/fetch"
 )
 
 const (
@@ -25,8 +30,13 @@ const (
 type LiveRoom struct {
 	Emitter    EventEmitter
 	Dispatcher *dispatch.Dispatcher
+	roomRepo   *implements.LiveRoomRepository
 	cl         *client.Client
 	running    bool
+}
+
+func (l *LiveRoom) SetRoomRepo(repo *implements.LiveRoomRepository) {
+	l.roomRepo = repo
 }
 
 func (l *LiveRoom) ConnectRoom(id int) error {
@@ -41,7 +51,7 @@ func (l *LiveRoom) ConnectRoom(id int) error {
 	}
 	config.Conf.RoomId = id
 	l.cl = client.NewClient(id)
-	l.cl.SetCookie(config.Conf.Auth.Cookie)
+	l.cl.SetCookie(config.Conf.Auth.PrimaryCookie())
 	l.registerHandler()
 
 	if err := l.cl.Start(); err != nil {
@@ -50,9 +60,35 @@ func (l *LiveRoom) ConnectRoom(id int) error {
 	}
 	l.running = true
 
-	roomInfo := fmt.Sprintf(`{"short_id":%d,"title":"直播间 %d"}`, id, id)
-	l.Emitter.Emit(EventStarted, roomInfo)
+	go l.initRoomInfo(id)
 	return nil
+}
+
+func (l *LiveRoom) initRoomInfo(id int) {
+	room, err := fetch.GetRoomInfo(id)
+	if err != nil {
+		log.Printf("[live] 获取房间信息失败: %v", err)
+		l.Emitter.Emit(EventStarted, fmt.Sprintf(`{"short_id":%d,"title":"直播间 %d"}`, id, id))
+		return
+	}
+
+	if l.roomRepo != nil {
+		t := &table.LiveRoomTable{
+			RoomId:        uint(id),
+			Owner:         room.User.UID,
+			ShortId:       uint(room.ShortId),
+			Title:         room.Title,
+			Cover:         room.Cover,
+			LongId:        room.LongId,
+			FollowerCount: room.FollowerCount,
+		}
+		if err := l.roomRepo.CreateOrUpdateLiveRoom(t); err != nil {
+			log.Printf("[live] 房间信息入库失败: %v", err)
+		}
+	}
+
+	info, _ := json.Marshal(room)
+	l.Emitter.Emit(EventStarted, string(info))
 }
 
 func (l *LiveRoom) registerHandler() {
@@ -63,7 +99,7 @@ func (l *LiveRoom) registerHandler() {
 
 func (l *LiveRoom) messageHandler(msg *message.Danmaku) {
 	if msg.Type == message.EmoticonDanmaku {
-		msg.Content = fmt.Sprintf("<img src='%s' max-width='100px' />", msg.Emoticon.Url)
+		msg.Content = fmt.Sprintf("<img src='%s' max-width='40px' />", msg.Emoticon.Url)
 	} else {
 		result := gjson.Get(msg.Raw, "info.0.15.extra").String()
 		if emots := gjson.Get(result, "emots"); emots.Exists() {
@@ -96,12 +132,13 @@ func (l *LiveRoom) messageHandler(msg *message.Danmaku) {
 		Sender:    *user,
 		MessageId: uuid.NewString(),
 		RoomId:    uint(config.Conf.RoomId),
+		Type:      int8(msg.Type),
 	}
 	l.Dispatcher.Dispatch(&dispatch.Message{
 		Type: dispatch.MsgDanMu,
 		Data: danMu,
 	})
-	l.Dispatcher.CollectUser(uid)
+	l.Dispatcher.CollectUser(user)
 }
 
 func (l *LiveRoom) userEntryHandler(s string) {

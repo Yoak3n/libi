@@ -1,9 +1,0 @@
-auth:
-    cookie: DedeUserID=33922058;DedeUserID__ckMd5=6c4288b6371877bc;Expires=;SESSDATA=fa8609cc%2C1797864699%2C089a9%2A61CjABYsypm-_lmqnDGYqtdDpJ12YV4D3SD0wcVeUmzY5pdT5B57pZCsgYWdOf6lf1K98SVmVGV0FGZjlNVjZTY1NoYWxjNGlfRDEwT3YwUE5nQ2lxMXhQdGhrUEJFbllHOVFNelRRWmZacnpHZzRSQmoxTFlnWmVlaEhidlZ1WFh2UHBNdFZqUkt3IIEC;bili_jct=11b357ad1636d3485ca3e5e193b1fb2a;
-    refresh_token: 8d4fd4ca96f38e5089e531d0b5b69961
-cache_ttl_hours: 24
-database:
-    name: bliveDB
-    type: sqlite
-port: 10420
-ws_port: 10421

@@ -46,30 +46,49 @@ func (r *UserRepository) CreateOrUpdateUserBatch(users []*schema.User) error {
 				if err := tx.Create(t).Error; err != nil {
 					return err
 				}
-				continue
-			}
-			if err != nil {
+			} else if err != nil {
 				return err
-			}
-
-			if existing.Name != u.Name {
-				history := &table.UserHistoryNameTable{
-					UID:  existing.UID,
-					Name: existing.Name,
+			} else {
+				if existing.Name != u.Name {
+					history := &table.UserHistoryNameTable{
+						UID:  existing.UID,
+						Name: existing.Name,
+					}
+					if err := tx.Create(history).Error; err != nil {
+						return err
+					}
 				}
-				if err := tx.Create(history).Error; err != nil {
+
+				updates := map[string]any{
+					"name":           u.Name,
+					"avatar":         u.Avatar,
+					"guard":          u.Guard,
+					"follower_count": u.FollowerCount,
+				}
+				if u.Sex >= 0 {
+					updates["sex"] = u.Sex
+				}
+				if err := tx.Model(&existing).Updates(updates).Error; err != nil {
 					return err
 				}
 			}
 
-			if err := tx.Model(&existing).Updates(map[string]any{
-				"name":           u.Name,
-				"sex":            u.Sex,
-				"avatar":         u.Avatar,
-				"guard":          u.Guard,
-				"follower_count": u.FollowerCount,
-			}).Error; err != nil {
-				return err
+			if u.Medal != nil {
+				medal := &table.MedalTable{
+					Owner:  u.Medal.OwnerID,
+					Name:   u.Medal.Name,
+					Level:  u.Medal.Level,
+					Target: u.Medal.TargetID,
+					Color:  u.Medal.Color,
+				}
+				if err := tx.Where("owner = ? AND target = ?", medal.Owner, medal.Target).
+					Assign(map[string]any{
+						"name":  medal.Name,
+						"level": medal.Level,
+						"color": medal.Color,
+					}).FirstOrCreate(medal).Error; err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -89,7 +108,7 @@ func (r *UserRepository) ReadUserBatchFresh(uids []uint, ttl time.Duration) (fre
 		return nil, uids, nil
 	}
 	var tables []table.UserTable
-	if err := r.db.Where("uid IN ?", uids).Find(&tables).Error; err != nil {
+	if err := r.db.Preload("Medals").Where("uid IN ?", uids).Find(&tables).Error; err != nil {
 		return nil, uids, err
 	}
 	lookup := make(map[uint]*table.UserTable, len(tables))

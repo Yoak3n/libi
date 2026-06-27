@@ -103,7 +103,7 @@ func GetUserInfo(uid uint) *schema.User {
 	return user
 }
 
-func GetUserInfoMultiply(uids []uint) []*schema.User {
+func GetUserInfoMultiply(uids []uint, medals map[uint]*schema.Medal) []*schema.User {
 	ttl := cacheTTL()
 	var result []*schema.User
 	var toFetch []uint
@@ -111,6 +111,9 @@ func GetUserInfoMultiply(uids []uint) []*schema.User {
 	// 1. In-memory LRU cache
 	for _, uid := range uids {
 		if u, ok := memCache.Get(uid); ok {
+			if m, hasMedal := medals[uid]; hasMedal && u.Medal == nil {
+				u.Medal = m
+			}
 			result = append(result, u)
 		} else {
 			toFetch = append(toFetch, uid)
@@ -126,6 +129,9 @@ func GetUserInfoMultiply(uids []uint) []*schema.User {
 		fresh, stale, err := userRepo.ReadUserBatchFresh(toFetch, ttl)
 		if err == nil {
 			for _, u := range fresh {
+				if m, hasMedal := medals[u.UID]; hasMedal && u.Medal == nil {
+					u.Medal = m
+				}
 				memCache.Put(u.UID, u)
 				result = append(result, u)
 			}
@@ -138,6 +144,9 @@ func GetUserInfoMultiply(uids []uint) []*schema.User {
 		fetched := fetch.GetUserInfoMultiply(toFetch)
 		if fetched != nil {
 			for _, u := range fetched {
+				if m, hasMedal := medals[u.UID]; hasMedal {
+					u.Medal = m
+				}
 				memCache.Put(u.UID, u)
 			}
 			result = append(result, fetched...)

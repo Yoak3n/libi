@@ -32,6 +32,7 @@ type VideoInterface interface {
 type LiveRoomInterface interface {
 	CreateLiveRoom(room *table.LiveRoomTable) error
 	ReadLiveRoom(roomId uint) (*table.LiveRoomTable, error)
+	CreateOrUpdateLiveRoom(room *table.LiveRoomTable) error
 	UpdateLiveRoom(room *table.LiveRoomTable) error
 	DeleteLiveRoom(roomId uint) error
 }
@@ -55,6 +56,7 @@ type CommentInterface interface {
 type SignedUserInterface interface {
 	CreateSignedUser(user *table.SignedUserTable) error
 	ReadSignedUser(uid uint) (*table.SignedUserTable, error)
+	ReadAllSignedUsers() ([]*table.SignedUserTable, error)
 	UpdateSignedUser(user *table.SignedUserTable) error
 	DeleteSignedUser(uid uint) error
 }
@@ -69,4 +71,33 @@ type UserEntryInterface interface {
 	ReadEntriesByRoom(roomId uint, limit int) ([]*schema.UserEntry, error)
 	ReadEntriesByUser(uid uint, limit int) ([]*schema.UserEntry, error)
 	CountByUser(uid uint) (int64, error)
+}
+
+type ConfigurationInterface interface {
+	CreateConfiguration(conf *table.ConfigurationTable) error
+	ReadConfiguration(id uint) (*table.ConfigurationTable, error)
+	ReadConfigurations() ([]*table.ConfigurationTable, error)
+	ReadValidConfigurations() ([]*table.ConfigurationTable, error)
+	ReadConfigurationByType(typ string) (*table.ConfigurationTable, error)
+	UpdateConfiguration(conf *table.ConfigurationTable) error
+	DeleteConfiguration(id uint) error
+	DeleteConfigurations(ids []uint) error
+}
+
+// TrollQueryInterface provides troll-specific query methods using raw SQL
+type TrollQueryInterface interface {
+	QuerySimilarComments(topic string, n int) ([]schema.SimilarCommentResult, error)
+	QueryTopNUserInTopic(topic string, n int) ([]schema.UserQuery, error)
+	GetCommentsByVideo(avid uint) schema.CommentGroupByVideo
+	SearchCommentWithKeyword(keyword string) []schema.CommentData
+	GetVideosByTopic(topic string) []schema.VideoWithCommentCount
+	GetAllTopicsList() []schema.TopicsData
+	GetDashboardStats() schema.DashboardStats
+	GetCommentsWithVideoFromUserInTopic(uid uint, topic string) []schema.CommentGroupByVideo
+	UpdateTopic(topic string, newTopic string) error
+	DeleteTopic(topic string) error
+	UpdateTopicOfVideos(avid []uint, topic string) error
+	DeleteVideos(avidList []uint) error
+	GetSignedUserRecord() ([]*table.UserTable, error)
+	GetSignedUserRecordByUID(uid uint) (*table.SignedUserTable, error)
 }

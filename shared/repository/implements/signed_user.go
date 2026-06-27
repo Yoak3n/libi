@@ -25,6 +25,14 @@ func (r *SignedUserRepository) ReadSignedUser(uid uint) (*table.SignedUserTable,
 	return &user, nil
 }
 
+func (r *SignedUserRepository) ReadAllSignedUsers() ([]*table.SignedUserTable, error) {
+	var users []*table.SignedUserTable
+	if err := r.db.Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 func (r *SignedUserRepository) UpdateSignedUser(user *table.SignedUserTable) error {
 	return r.db.Save(user).Error
 }

@@ -25,6 +25,18 @@ func (r *LiveRoomRepository) ReadLiveRoom(roomId uint) (*table.LiveRoomTable, er
 	return &room, nil
 }
 
+func (r *LiveRoomRepository) CreateOrUpdateLiveRoom(room *table.LiveRoomTable) error {
+	return r.db.Where("room_id = ?", room.RoomId).
+		Assign(map[string]any{
+			"owner":          room.Owner,
+			"short_id":       room.ShortId,
+			"title":          room.Title,
+			"cover":          room.Cover,
+			"long_id":        room.LongId,
+			"follower_count": room.FollowerCount,
+		}).FirstOrCreate(room).Error
+}
+
 func (r *LiveRoomRepository) UpdateLiveRoom(room *table.LiveRoomTable) error {
 	return r.db.Save(room).Error
 }

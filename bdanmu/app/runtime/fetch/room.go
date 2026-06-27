@@ -4,14 +4,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Yoak3n/libi/shared/config"
 	"github.com/Yoak3n/libi/shared/domain/model/schema"
 	"github.com/Yoak3n/libi/shared/package/request"
 	"github.com/tidwall/gjson"
 )
 
 func GetRoomInfo(id int) (*schema.Room, error) {
-	res, err := request.Get("https://api.live.bilibili.com/room/v1/Room/get_info", fmt.Sprintf("room_id=%d", config.Conf.RoomId))
+	res, err := request.Get("https://api.live.bilibili.com/room/v1/Room/get_info", fmt.Sprintf("room_id=%d", id))
 	if err != nil {
 		return nil, err
 	}
@@ -33,5 +32,4 @@ func GetRoomInfo(id int) (*schema.Room, error) {
 		return room, nil
 	}
 	return nil, errors.New("get room information failed")
-
 }

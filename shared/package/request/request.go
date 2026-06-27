@@ -24,7 +24,7 @@ func Get(urlStr string, args ...string) ([]byte, error) {
 	}
 	req, _ := http.NewRequest(http.MethodGet, urlStr+params, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0")
-	req.Header.Set("Cookie", config.Conf.Auth.Cookie)
+	req.Header.Set("Cookie", config.Conf.Auth.PrimaryCookie())
 	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func GetWithWbi(urlStr string) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0")
-	req.Header.Set("Cookie", config.Conf.Auth.Cookie)
+	req.Header.Set("Cookie", config.Conf.Auth.PrimaryCookie())
 	client := &http.Client{}
 	parsed, err := url.Parse(config.Conf.Proxy)
 	if err == nil && parsed.String() != "" {

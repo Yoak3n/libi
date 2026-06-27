@@ -37,7 +37,7 @@ func (a *AuthService) CheckLogin() bool {
 	}
 
 	// Try refreshing cookie
-	if config.Conf.Auth.RefreshToken != "" {
+	if config.Conf.Auth.PrimaryRefreshToken() != "" {
 		if err := client.RefreshCookie(); err == nil {
 			ok, err = client.IsLogin()
 			if err == nil && ok {
@@ -83,7 +83,7 @@ func (a *AuthService) StartLogin() {
 
 // SyncAuth returns the current cookie and refresh token from config.
 func (a *AuthService) SyncAuth() [2]string {
-	return [2]string{config.Conf.Auth.Cookie, config.Conf.Auth.RefreshToken}
+	return [2]string{config.Conf.Auth.PrimaryCookie(), config.Conf.Auth.PrimaryRefreshToken()}
 }
 
 // SyncRoomId returns the current room ID from config.
@@ -111,9 +111,8 @@ func (a *AuthService) IsWSRunning() bool {
 }
 
 func (a *AuthService) newClient() *login.Client {
-	return login.NewClient(config.Conf.Auth.Cookie, config.Conf.Auth.RefreshToken, func(cookie, refreshToken string) {
-		config.Conf.Auth.Cookie = cookie
-		config.Conf.Auth.RefreshToken = refreshToken
+	return login.NewClient(config.Conf.Auth.PrimaryCookie(), config.Conf.Auth.PrimaryRefreshToken(), func(cookie, refreshToken string) {
+		config.Conf.Auth.SetPrimary(cookie, refreshToken)
 		config.SaveAuth()
 	})
 }

@@ -2,13 +2,14 @@
     <div class="dashboard-wrapper" ref="containerRef">
         <n-affix :trigger-top="0" :listen-to="() => containerRef" class="super-chat-box">
             <Transition name="sc">
-                <div v-if="superChats.length > 0">
-                    <SuperChatbox v-for="superChat in superChats" :key="superChat.message_id" :data="superChat" />
+                <div v-if="superChats.length > 0" class="super-chat-list">
+                    <SuperChatbox v-for="superChat in superChats" :key="superChat.message_id" :data="superChat"
+                        @done="removeSuperChat(superChat.message_id)" />
                 </div>
             </Transition>
             <!-- <button @click="testSuperChat">test</button> -->
         </n-affix>
-        <n-infinite-scroll class="danmu-box" style="z-index: -1;">
+        <n-infinite-scroll ref="danmuBoxRef" class="danmu-box">
             <transition-group name="fade" tag="div">
                 <Danmubox v-for="(danmu, index) in danmus" :id="index == danmus.length - 1 ? 'bottom' : ''"
                     :key="danmu.message_id" class="danmu-item" :danmu="danmu" />
@@ -17,7 +18,7 @@
     </div>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, nextTick, onActivated } from 'vue';
+import { ref, onMounted, nextTick, onActivated, onBeforeUnmount } from 'vue';
 import { NAffix, NInfiniteScroll } from 'naive-ui'
 import { useRoute, useRouter } from 'vue-router';
 import { useRoomStore } from '@/store'
@@ -30,10 +31,22 @@ import { Events } from '@wailsio/runtime'
 
 const roomsStore = useRoomStore()
 const containerRef = ref<HTMLElement | undefined>(undefined)
+const danmuBoxRef = ref<InstanceType<typeof NInfiniteScroll> | undefined>(undefined)
 const $route = useRoute()
 const $router = useRouter()
 let danmus = ref<Array<Danmu>>([])
 let superChats = ref<Array<SuperChat>>([])
+
+let autoScroll = true
+let scrollPauseTimer: ReturnType<typeof setTimeout> | null = null
+
+function onWheel(e: WheelEvent) {
+    if (e.deltaY < 0) {
+        autoScroll = false
+        if (scrollPauseTimer) clearTimeout(scrollPauseTimer)
+        scrollPauseTimer = setTimeout(() => { autoScroll = true }, 5000)
+    }
+}
 
 onActivated(() => {
     if ($route.query.from == "login") {
@@ -52,6 +65,9 @@ onActivated(() => {
 })
 
 onMounted(() => {
+    const el = danmuBoxRef.value?.$el as HTMLElement | undefined
+    if (el) el.addEventListener('wheel', onWheel, { passive: true })
+
     Events.On('started', function (ev: any) {
         const room: Room = JSON.parse(ev.data as string)
         roomsStore.setRoomTitle(room.title)
@@ -66,12 +82,20 @@ onMounted(() => {
     })
 })
 
+onBeforeUnmount(() => {
+    const el = danmuBoxRef.value?.$el as HTMLElement | undefined
+    if (el) el.removeEventListener('wheel', onWheel)
+    if (scrollPauseTimer) clearTimeout(scrollPauseTimer)
+})
+
 
 const pushSuperChat = (super_chat: SuperChat) => {
     superChats.value.push(super_chat)
-    setTimeout(() => {
-        superChats.value.splice(superChats.value.findIndex((sc) => sc.end_time == super_chat.end_time), 1)
-    }, (super_chat.end_time - super_chat.timestamp) * 1000)
+}
+
+const removeSuperChat = (message_id: string) => {
+    const idx = superChats.value.findIndex(sc => sc.message_id === message_id)
+    if (idx !== -1) superChats.value.splice(idx, 1)
 }
 
 const pushDanmu = (danmu: Danmu) => {
@@ -79,10 +103,12 @@ const pushDanmu = (danmu: Danmu) => {
         danmus.value.shift()
     }
     danmus.value.push(danmu)
-    nextTick(() => {
-        const bottom = document.getElementById("bottom")
-        bottom?.scrollIntoView({ behavior: "smooth", block: "center", inline: "end" });
-    })
+    if (autoScroll) {
+        nextTick(() => {
+            const bottom = document.getElementById("bottom")
+            bottom?.scrollIntoView({ behavior: "smooth", block: "center", inline: "end" });
+        })
+    }
 }
 const reciveMessage = (ev: any) => {
     const message: Message = ev.data
@@ -141,6 +167,12 @@ const updateUser = (user: User) => {
     // margin: 0 2rem;
     .super-chat-box {
         width: 100%;
+        pointer-events: none;
+        z-index: 10;
+    }
+
+    .super-chat-list {
+        pointer-events: none;
     }
 
     .danmu-box {

@@ -12,3 +12,4 @@ build/android/gen/
 
 data/
 node_modules/
+config.yaml

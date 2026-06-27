@@ -18,7 +18,7 @@ type Dispatcher struct {
 	queue   *Queue
 }
 
-func NewDispatcher(emitter EventEmitter, db *gorm.DB, getUsers func([]uint) []*schema.User) *Dispatcher {
+func NewDispatcher(emitter EventEmitter, db *gorm.DB, getUsers func([]uint, map[uint]*schema.Medal) []*schema.User) *Dispatcher {
 	d := &Dispatcher{
 		emitter: emitter,
 		ws:      NewWSServer(),
@@ -59,14 +59,18 @@ func (d *Dispatcher) Dispatch(msg *Message) {
 	d.enqueue(msg)
 }
 
-func (d *Dispatcher) CollectUser(uid uint) {
+func (d *Dispatcher) CollectUser(user *schema.User) {
 	if d.queue == nil {
 		return
 	}
+	cu := collectedUser{uid: user.UID}
+	if user.Medal != nil {
+		cu.medal = user.Medal
+	}
 	select {
-	case d.queue.CollectUser <- uid:
+	case d.queue.CollectUser <- cu:
 	default:
-		log.Printf("[dispatch] collectUser chan full, dropping uid=%d", uid)
+		log.Printf("[dispatch] collectUser chan full, dropping uid=%d", user.UID)
 	}
 }
 

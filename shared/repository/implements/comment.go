@@ -3,6 +3,7 @@ package implements
 import (
 	"github.com/Yoak3n/libi/shared/domain/model/table"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type CommentRepository struct {
@@ -18,7 +19,10 @@ func (r *CommentRepository) CreateComment(comment *table.CommentTable) error {
 }
 
 func (r *CommentRepository) CreateCommentBatch(comments []*table.CommentTable) error {
-	return r.db.Create(&comments).Error
+	return r.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "comment_id"}},
+		UpdateAll: true,
+	}).Create(&comments).Error
 }
 
 func (r *CommentRepository) ReadComment(commentId uint) (*table.CommentTable, error) {

@@ -60,6 +60,7 @@ func InitDatabase() {
 		&table.CommentTable{},
 		&table.SignedUserTable{},
 		&table.UserEntryTable{},
+		&table.ConfigurationTable{},
 	)
 	if err != nil {
 		panic(err)

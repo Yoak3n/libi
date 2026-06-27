@@ -10,11 +10,15 @@ import (
 
 	"github.com/Yoak3n/libi/shared/config"
 	"github.com/Yoak3n/libi/shared/database"
+	"github.com/Yoak3n/libi/shared/repository/implements"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
+
+//go:embed build/windows/icon.ico
+var trayIcon []byte
 
 func init() {
 	application.RegisterEvent[string](service.EventQRCode)
@@ -62,6 +66,9 @@ func main() {
 	authService.Dispatcher = dispatcher
 
 	liveRoom := &service.LiveRoom{Emitter: app.Event, Dispatcher: dispatcher}
+	if database.DB() != nil {
+		liveRoom.SetRoomRepo(implements.NewLiveRoomRepository(database.DB()))
+	}
 
 	// 监听前端切换房间事件
 	app.Event.On(service.EventChange, func(ev *application.CustomEvent) {
@@ -80,7 +87,7 @@ func main() {
 	// 'Mac' options tailor the window when running on macOS.
 	// 'BackgroundColour' is the background colour of the window.
 	// 'URL' is the URL that will be loaded into the webview.
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "",
 		Width:            512,
 		Height:           900,
@@ -92,6 +99,29 @@ func main() {
 		Windows: application.WindowsWindow{
 			DisableFramelessWindowDecorations: false,
 		},
+	})
+
+	// 系统托盘
+	systemTray := app.SystemTray.New()
+	systemTray.SetIcon(trayIcon)
+	systemTray.SetTooltip("bdanmu")
+
+	menu := app.NewMenu()
+	menu.Add("显示窗口").OnClick(func(ctx *application.Context) {
+		window.Show()
+	})
+	menu.AddSeparator()
+	menu.Add("退出").OnClick(func(ctx *application.Context) {
+		app.Quit()
+	})
+	systemTray.SetMenu(menu)
+
+	systemTray.OnClick(func() {
+		if window.IsVisible() {
+			window.Hide()
+		} else {
+			window.Show()
+		}
 	})
 
 	err := app.Run()

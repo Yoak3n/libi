@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, PropType} from 'vue';
+import { ref, onMounted, onBeforeUnmount, PropType} from 'vue';
 import { NAvatar,NEllipsis} from 'naive-ui';
 import { SuperChat, computeSuperChatBackground } from './super_chat'
 import { Browser } from '@wailsio/runtime';
@@ -10,14 +10,29 @@ const props = defineProps({
     required: true,
   }
 })
+const emit = defineEmits<{ done: [] }>()
 const superChatRef = ref<undefined | HTMLElement>(undefined)
 const color = computeSuperChatBackground(props.data.price)
-const long = props.data.end_time - props.data.timestamp
+const now = Math.floor(Date.now() / 1000)
+const long = Math.max(1, props.data.end_time - now)
 let height = 30
+
+let timer: ReturnType<typeof setTimeout> | null = null
+
+onMounted(() => {
+  // 进度条动画结束后触发清除，多等 1.5s 留给 fade-out 过渡
+  timer = setTimeout(() => {
+    emit('done')
+  }, long * 1000 + 1500) // 多等 1.5s 留给 fade-out 过渡
+})
+
+onBeforeUnmount(() => {
+  if (timer) clearTimeout(timer)
+})
 </script>
 
 <template>
-  <div class="super-chat-wrapper" ref="superChatRef" style="z-index: 99999;" >
+  <div class="super-chat-wrapper" ref="superChatRef">
       <div class="super-chat-box" v-if="props.data != null" >
       <div class="info">
         <a href="javascript:void(0)" @click="Browser.OpenURL('https://space.bilibili.com/' + props.data.user.uid)">
@@ -51,8 +66,10 @@ let height = 30
   align-items: center;
   min-height: 2rem;
   color: rgba(28, 28, 28,1);
+  pointer-events: none;
   animation: in 1s ease-in-out;
   .super-chat-box {
+    pointer-events: auto;
     display: flex;
     flex-flow: row wrap;
     position: relative;
