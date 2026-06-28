@@ -77,7 +77,9 @@ func (v *Video) Run() {
 		Description: videoInfo.Description,
 		Owner:       videoInfo.Owner,
 	}
-	videoData.Comments = LazilyGetAllComments(videoInfo.Avid, videoInfo.Review)
+	tracker := NewProgressTracker()
+	tracker.RegisterWorker(1)
+	videoData.Comments = LazilyGetAllComments(videoInfo.Avid, videoInfo.Review, tracker, 1, videoInfo.Title)
 
 	videoRecord := &table.VideoTable{
 		Avid:        videoData.Avid,

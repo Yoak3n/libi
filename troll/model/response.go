@@ -97,7 +97,10 @@ type SearchResponse struct {
 }
 
 type SearchResponseData struct {
-	Result []SearchItem `json:"result"`
+	NumPages   int          `json:"numPages"`
+	NumResults int          `json:"numResults"`
+	PageSize   int          `json:"pagesize"`
+	Result     []SearchItem `json:"result"`
 }
 
 type SearchItem struct {

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -24,11 +25,11 @@ const (
 	LazilyLoadUrl = "https://api.bilibili.com/x/v2/reply/wbi/main"
 )
 
-func LazilyGetAllComments(avid uint, total int) []model.CommentData {
+func LazilyGetAllComments(avid uint, total int, tracker *ProgressTracker, workerID int, title string) []model.CommentData {
 	allComments := make([]model.CommentData, 0)
 	offset := ""
 	var counter atomic.Int64
-	stopProgress := startProgressBar(&counter, total)
+	stopProgress := tracker.StartJob(workerID, &counter, total, title)
 	for {
 		params := map[string]string{
 			"oid":          strconv.FormatUint(uint64(avid), 10),
@@ -75,41 +76,138 @@ func LazilyGetAllComments(avid uint, total int) []model.CommentData {
 	return allComments
 }
 
-func startProgressBar(counter *atomic.Int64, total int) func() {
-	start := time.Now()
-	done := make(chan struct{})
-	go func() {
-		ticker := time.NewTicker(200 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-done:
-				return
-			case <-ticker.C:
-				count := counter.Load()
-				if total > 0 {
-					pct := float64(count) / float64(total) * 100
-					barWidth := 30
-					filled := int(float64(barWidth) * float64(count) / float64(total))
-					if filled > barWidth {
-						filled = barWidth
-					}
-					bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
-					fmt.Printf("  [%s] %d/%d %.1f%%\r", bar, count, total, pct)
-				} else {
-					fmt.Printf("  Collecting comments: %d\r", count)
-				}
-			}
-		}
-	}()
-	return func() {
-		close(done)
-		elapsed := time.Since(start)
-		count := counter.Load()
-		if count > 0 {
-			fmt.Printf("  Collected %d comments. Elapsed: %v          \n", count, elapsed.Round(time.Millisecond))
+// ProgressTracker manages multiple worker progress bars on a shared terminal display.
+// A single display goroutine renders all active workers atomically, avoiding interleaving
+// with other terminal output (e.g. log.Printf).
+type ProgressTracker struct {
+	mu         sync.Mutex
+	workers    map[int]*progressWorker
+	lineWidth  int // length of last rendered line, used to pad/overwrite
+}
+
+type progressWorker struct {
+	counter *atomic.Int64
+	total   int
+	title   string
+	start   time.Time
+	done    chan struct{}
+	elapsed time.Duration // set when worker finishes
+	finished bool
+}
+
+func NewProgressTracker() *ProgressTracker {
+	return &ProgressTracker{
+		workers: make(map[int]*progressWorker),
+	}
+}
+
+// RegisterWorker creates a persistent slot for a worker. Call once per worker lifetime.
+func (pt *ProgressTracker) RegisterWorker(workerID int) {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+	if _, exists := pt.workers[workerID]; !exists {
+		pt.workers[workerID] = &progressWorker{
+			done: make(chan struct{}),
 		}
 	}
+}
+
+// StartJob begins a new job for the given worker. Returns a stop function.
+func (pt *ProgressTracker) StartJob(workerID int, counter *atomic.Int64, total int, title string) func() {
+	pt.mu.Lock()
+	pw := pt.workers[workerID]
+	pw.counter = counter
+	pw.total = total
+	pw.title = title
+	pw.start = time.Now()
+	pw.finished = false
+	pw.elapsed = 0
+	// Reset the done channel for this job
+	pw.done = make(chan struct{})
+	done := pw.done
+	pt.mu.Unlock()
+
+	go pt.displayLoop(done)
+
+	return func() {
+		close(done)
+		pw.elapsed = time.Since(pw.start)
+		pw.finished = true
+		count := pw.counter.Load()
+		if count > 0 {
+			fmt.Printf("\r\033[2K  %s Collected %d comments. Elapsed: %v\n", pw.title, count, pw.elapsed.Round(time.Millisecond))
+		}
+		pt.lineWidth = 0
+	}
+}
+
+func (pt *ProgressTracker) displayLoop(done chan struct{}) {
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			pt.render()
+		}
+	}
+}
+
+func (pt *ProgressTracker) render() {
+	pt.mu.Lock()
+	defer pt.mu.Unlock()
+	if len(pt.workers) == 0 {
+		return
+	}
+	// Find the max worker ID to know how many workers to render
+	maxID := 0
+	for id := range pt.workers {
+		if id > maxID {
+			maxID = id
+		}
+	}
+	// Build all worker segments and print on a single line with \r
+	var parts []string
+	for i := 1; i <= maxID; i++ {
+		pw, ok := pt.workers[i]
+		if !ok {
+			continue
+		}
+		count := pw.counter.Load()
+		title := pw.title
+		if len(title) > 20 {
+			title = title[:17] + "..."
+		}
+		var seg string
+		if pw.finished {
+			seg = fmt.Sprintf("[%s] Done(%d, %v)", title, count, pw.elapsed.Round(time.Millisecond))
+		} else if pw.total > 0 {
+			pct := float64(count) / float64(pw.total) * 100
+			barWidth := 15
+			filled := int(float64(barWidth) * float64(count) / float64(pw.total))
+			if filled > barWidth {
+				filled = barWidth
+			}
+			bar := strings.Repeat("█", filled) + strings.Repeat("░", barWidth-filled)
+			elapsed := time.Since(pw.start).Seconds()
+			speed := 0.0
+			if elapsed > 0 {
+				speed = float64(count) / elapsed
+			}
+			seg = fmt.Sprintf("[%s] %s %d/%d %.0f%% %.0f/s", bar, title, count, pw.total, pct, speed)
+		} else {
+			seg = fmt.Sprintf("%s %d", title, count)
+		}
+		parts = append(parts, seg)
+	}
+	line := "  " + strings.Join(parts, "  |  ")
+	// Pad with spaces to clear any leftover characters from previous (longer) line
+	if pt.lineWidth > len(line) {
+		line += strings.Repeat(" ", pt.lineWidth-len(line))
+	}
+	pt.lineWidth = len(line)
+	fmt.Printf("\r%s", line)
 }
 
 func extractComments(items []model.CommentItem, parent uint, counter *atomic.Int64) []model.CommentData {
@@ -386,8 +484,13 @@ func QueryTopNUser(topic string, n int) ([]schema.UserQuery, error) {
 	return TrollRepo.QueryTopNUserInTopic(topic, n)
 }
 
+// QueryTopNUserMultiTopic wraps troll repo for multi-topic query
+func QueryTopNUserMultiTopic(topics []string, n int) ([]schema.UserQuery, error) {
+	return TrollRepo.QueryTopNUserInTopics(topics, n)
+}
+
 // QuerySimilarComments wraps troll repo
-func QuerySimilarComments(topic string, n int) ([]schema.SimilarCommentResult, error) {
+func QuerySimilarComments(topic string, n int) ([]schema.SimilarCommentGroup, error) {
 	return TrollRepo.QuerySimilarComments(topic, n)
 }
 

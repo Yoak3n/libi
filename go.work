@@ -4,4 +4,5 @@ use (
 	./bdanmu
 	./shared
 	./troll
+	./tools/migrate
 )

@@ -29,14 +29,14 @@ func configCommand() *cli.Command {
 			configLoginCommand(),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
-			ensureService()
-			if c.Clean {
-				return cleanAccounts()
-			}
 			if c.List {
 				return listAccounts()
 			}
+			if c.Clean {
+				return cleanAccounts()
+			}
 			if c.Proxy != "" {
+				ensureService()
 				return setProxy(c.Proxy)
 			}
 			return cli.Exit("Use --proxy, --list, --clean, or 'config login'", 1)
@@ -154,8 +154,8 @@ func listAccounts() error {
 	rows := make([][]string, 0, len(accounts))
 	for i, acc := range accounts {
 		uid := "-"
-		if acc.UID != 0 {
-			uid = fmt.Sprintf("%d", acc.UID)
+		if extracted := sharedconfig.ExtractUID(acc.Cookie); extracted != 0 {
+			uid = fmt.Sprintf("%d", extracted)
 		}
 		cookie := acc.Cookie
 		if len(cookie) > 40 {

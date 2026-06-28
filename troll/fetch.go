@@ -9,9 +9,10 @@ import (
 )
 
 type fetchArgs struct {
-	topic string
-	AVId  int64
-	BVId  string
+	topic    string
+	AVId     int64
+	BVId     string
+	maxPages int
 }
 
 func fetchCommand() *cli.Command {
@@ -63,6 +64,15 @@ func fetchCommand() *cli.Command {
 				},
 			},
 		},
+		Flags: []cli.Flag{
+			&cli.IntFlag{
+				Name:        "pages",
+				Value:       1,
+				Aliases:     []string{"p"},
+				Usage:       "max search result pages to fetch (topic mode)",
+				Destination: &f.maxPages,
+			},
+		},
 	}
 }
 
@@ -70,7 +80,7 @@ func fetchEntry(f *fetchArgs) {
 	if title == "" {
 		title = f.topic
 	}
-	h := service.NewHandler("", title, f.topic, f.BVId, f.AVId)
+	h := service.NewHandler("", title, f.topic, f.BVId, f.AVId, f.maxPages)
 	h.Run()
 	fmt.Println("Fetch completed.")
 }

@@ -60,7 +60,7 @@ type App struct {
 
 	menuCursor      int
 	topUsers        []topUserItem
-	similarComments []similarItem
+	similarComments []similarGroup
 	stats           schema.DashboardStats
 	searchResults   []commentItem
 	topicSelectFor  string // "topUsers" or "similar"
@@ -80,6 +80,9 @@ type App struct {
 	signedUserInput  string // description input buffer for add/edit
 	signedUserField  string // "uid" or "description" during add/edit
 	editTargetUID    uint   // UID being edited
+
+	topicSelected   []bool   // multi-select state for viewTopicSelect
+	selectedTopics  []string // confirmed topic selection for loadTopUsers
 }
 
 type topicItem struct {
@@ -113,10 +116,18 @@ type topUserItem struct {
 	Count    int
 }
 
-type similarItem struct {
-	Text  string
-	Count int
-	Ids   string
+type similarGroup struct {
+	Text     string
+	Count    int
+	Comments []similarDetail
+}
+
+type similarDetail struct {
+	CommentId  uint
+	Username   string
+	VideoTitle string
+	Bvid       string
+	CreatedAt  time.Time
 }
 
 type userVideoGroup struct {
@@ -157,8 +168,11 @@ type commentsLoadedMsg struct {
 }
 type searchResultsLoadedMsg []commentItem
 type topUsersLoadedMsg []topUserItem
-type similarLoadedMsg []similarItem
+type similarLoadedMsg []similarGroup
 type dashboardLoadedMsg schema.DashboardStats
 type userCommentsLoadedMsg []userVideoGroup
 type signedUsersLoadedMsg []signedUserItem
+type browserOpenedMsg struct {
+	err error
+}
 type errMsg error

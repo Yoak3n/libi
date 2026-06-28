@@ -40,10 +40,7 @@ func Init() {
 	if config.Conf.Auth != nil {
 		for _, acc := range config.Conf.Auth.Accounts {
 			if acc.RefreshToken != "" {
-				uid := acc.UID
-				if uid == 0 {
-					uid = config.ExtractUID(acc.Cookie)
-				}
+				uid := config.ExtractUID(acc.Cookie)
 				Conf.Entries = append(Conf.Entries, CookieEntry{
 					UID:          uid,
 					Cookie:       acc.Cookie,

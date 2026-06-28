@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/urfave/cli/v3"
 	"troll/internal/util"
@@ -94,7 +95,11 @@ func queryTop(flag string, count int) error {
 		}
 		rows := make([][]string, len(comments))
 		for i, c := range comments {
-			rows[i] = []string{c.Text, fmt.Sprintf("%d", c.Count), c.CommentIds}
+			ids := make([]string, len(c.Comments))
+			for j, cm := range c.Comments {
+				ids[j] = fmt.Sprintf("%d", cm.CommentId)
+			}
+			rows[i] = []string{c.Text, fmt.Sprintf("%d", c.Count), strings.Join(ids, ", ")}
 		}
 		printTable([]string{"Text", "Count", "Comment IDs"}, rows)
 	default:

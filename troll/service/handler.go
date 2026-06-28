@@ -81,26 +81,28 @@ func InitDB() {
 }
 
 type Handler struct {
-	Title string
-	Topic string
-	Cache string
-	Bvid  string
-	Avid  int64
+	Title    string
+	Topic    string
+	Cache    string
+	Bvid     string
+	Avid     int64
+	MaxPages int
 }
 
-func NewHandler(cache, title, topic, bvid string, avid int64) *Handler {
+func NewHandler(cache, title, topic, bvid string, avid int64, maxPages int) *Handler {
 	return &Handler{
-		Title: title,
-		Topic: topic,
-		Cache: cache,
-		Bvid:  bvid,
-		Avid:  avid,
+		Title:    title,
+		Topic:    topic,
+		Cache:    cache,
+		Bvid:     bvid,
+		Avid:     avid,
+		MaxPages: maxPages,
 	}
 }
 
 func (h *Handler) Run() {
 	if h.Topic != "" {
-		NewTopic(h.Cache, h.Title, strings.Split(h.Topic, ","))
+		NewTopic(h.Cache, h.Title, strings.Split(h.Topic, ","), h.MaxPages)
 		return
 	}
 	if h.Bvid != "" || h.Avid != -1 {

@@ -2,12 +2,18 @@ package schema
 
 import "time"
 
-type SimilarCommentResult struct {
-	Text       string
-	Count      int
-	CommentIds string
-	Example1   string
-	Example2   string
+type SimilarCommentGroup struct {
+	Text     string
+	Count    int
+	Comments []SimilarCommentDetail
+}
+
+type SimilarCommentDetail struct {
+	CommentId  uint
+	Username   string
+	VideoTitle string
+	Bvid       string
+	CreatedAt  time.Time
 }
 
 type UserQuery struct {

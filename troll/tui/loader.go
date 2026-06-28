@@ -95,9 +95,9 @@ func (a *App) doSearch(keyword string) tea.Cmd {
 	}
 }
 
-func (a *App) loadTopUsers(topic string) tea.Cmd {
+func (a *App) loadTopUsers(topics []string) tea.Cmd {
 	return func() tea.Msg {
-		users, err := service.QueryTopNUser(topic, 30)
+		users, err := service.QueryTopNUserMultiTopic(topics, 30)
 		if err != nil {
 			return errMsg(err)
 		}
@@ -116,16 +116,26 @@ func (a *App) loadTopUsers(topic string) tea.Cmd {
 
 func (a *App) loadSimilar(topic string) tea.Cmd {
 	return func() tea.Msg {
-		comments, err := service.QuerySimilarComments(topic, 30)
+		groups, err := service.QuerySimilarComments(topic, 30)
 		if err != nil {
 			return errMsg(err)
 		}
-		items := make([]similarItem, len(comments))
-		for i, c := range comments {
-			items[i] = similarItem{
-				Text:  c.Text,
-				Count: c.Count,
-				Ids:   c.CommentIds,
+		items := make([]similarGroup, len(groups))
+		for i, g := range groups {
+			details := make([]similarDetail, len(g.Comments))
+			for j, c := range g.Comments {
+				details[j] = similarDetail{
+					CommentId:  c.CommentId,
+					Username:   c.Username,
+					VideoTitle: c.VideoTitle,
+					Bvid:       c.Bvid,
+					CreatedAt:  c.CreatedAt,
+				}
+			}
+			items[i] = similarGroup{
+				Text:     g.Text,
+				Count:    g.Count,
+				Comments: details,
 			}
 		}
 		return similarLoadedMsg(items)

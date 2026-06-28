@@ -1,59 +1,49 @@
-# Welcome to Your New Wails3 Project!
+# bdanmu
 
-Congratulations on generating your Wails3 application! This README will guide you through the next steps to get your project up and running.
+Bilibili 直播间弹幕桌面客户端。通过 WebSocket 连接直播间，实时展示弹幕、SC（Super Chat）和用户进入事件。
 
-## Getting Started
+## 功能
 
-1. Navigate to your project directory in the terminal.
+- 扫码登录，支持 Cookie 自动刷新
+- 实时弹幕展示，支持表情渲染
+- Super Chat 悬浮展示（顶部置顶，自动淡出）
+- 用户进入记录追踪
+- 用户信息三级缓存（内存 LRU -> SQLite -> Bilibili API）
+- 弹幕批量持久化（每 2 秒或达到批量阈值时写入数据库）
+- WebSocket 广播服务，可将消息转发给外部客户端
+- 系统托盘集成（显示/隐藏窗口、退出）
+- 切换直播间
 
-2. To run your application in development mode, use the following command:
+## 技术栈
 
-   ```
-   wails3 dev
-   ```
+| 层 | 技术 |
+|---|------|
+| 后端 | Go, Wails v3, blivedm-go, GORM, coder/websocket |
+| 前端 | Vue 3, TypeScript, Vite, Naive UI, Pinia |
+| 数据库 | SQLite（默认）/ PostgreSQL |
 
-   This will start your application and enable hot-reloading for both frontend and backend changes.
+## 构建
 
-3. To build your application for production, use:
+```bash
+cd frontend && pnpm install && pnpm build
+wails3 build
+```
 
-   ```
-   wails3 build
-   ```
+前端产物通过 `//go:embed` 嵌入 Go 二进制文件。
 
-   This will create a production-ready executable in the `build` directory.
+## 配置
 
-## Exploring Wails3 Features
+`config.yaml`：
 
-Now that you have your project set up, it's time to explore the features that Wails3 offers:
+```yaml
+auth:
+  accounts:
+    - cookie: "<bilibili cookie>"
+      refresh_token: "<refresh token>"
+cache_ttl_hours: 24
+database:
+  name: bliveDB
+  type: sqlite    # 或 postgres
+```
 
-1. **Check out the examples**: The best way to learn is by example. Visit the `examples` directory in the `v3/examples` directory to see various sample applications.
-
-2. **Run an example**: To run any of the examples, navigate to the example's directory and use:
-
-   ```
-   go run .
-   ```
-
-   Note: Some examples may be under development during the alpha phase.
-
-3. **Explore the documentation**: Visit the [Wails3 documentation](https://v3.wails.io/) for in-depth guides and API references.
-
-4. **Join the community**: Have questions or want to share your progress? Join the [Wails Discord](https://discord.gg/JDdSxwjhGf) or visit the [Wails discussions on GitHub](https://github.com/wailsapp/wails/discussions).
-
-## Project Structure
-
-Take a moment to familiarize yourself with your project structure:
-
-- `frontend/`: Contains your frontend code (HTML, CSS, JavaScript/TypeScript)
-- `main.go`: The entry point of your Go backend
-- `app.go`: Define your application structure and methods here
-- `wails.json`: Configuration file for your Wails project
-
-## Next Steps
-
-1. Modify the frontend in the `frontend/` directory to create your desired UI.
-2. Add backend functionality in `main.go`.
-3. Use `wails3 dev` to see your changes in real-time.
-4. When ready, build your application with `wails3 build`.
-
-Happy coding with Wails3! If you encounter any issues or have questions, don't hesitate to consult the documentation or reach out to the Wails community.
+PostgreSQL 需额外配置 `host`、`port`、`user`、`password`。

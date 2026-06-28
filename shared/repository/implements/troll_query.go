@@ -2,6 +2,7 @@ package implements
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Yoak3n/libi/shared/domain/model/schema"
@@ -17,23 +18,88 @@ func NewTrollQueryRepository(db *gorm.DB) *TrollQueryRepository {
 	return &TrollQueryRepository{db: db}
 }
 
-func (r *TrollQueryRepository) QuerySimilarComments(topic string, n int) ([]schema.SimilarCommentResult, error) {
-	var comments []schema.SimilarCommentResult
-	subQuery := r.db.Table("comment_tables AS c").
-		Select("SUBSTR(c.text, 1, 30) AS text, COUNT(*) AS count, GROUP_CONCAT(c.comment_id, ', ') AS comment_ids").
-		Joins("INNER JOIN video_tables v ON c.video_avid = v.avid").
-		Where("c.text IS NOT NULL AND LENGTH(c.text) >= 10 AND v.topic = ?", topic).
-		Group("SUBSTR(c.text, 1, 30)").
-		Having("COUNT(*) > 1")
+func (r *TrollQueryRepository) QuerySimilarComments(topic string, n int) ([]schema.SimilarCommentGroup, error) {
+	type scanRow struct {
+		TextPrefix string    `gorm:"column:text_prefix"`
+		CommentId  uint      `gorm:"column:comment_id"`
+		Username   string    `gorm:"column:username"`
+		VideoTitle string    `gorm:"column:video_title"`
+		Bvid       string    `gorm:"column:bvid"`
+		CreatedAt  time.Time `gorm:"column:created_at"`
+	}
 
-	query := r.db.Table("(?) AS similar_groups", subQuery).
-		Order("count DESC, text").
-		Limit(n)
-
-	if err := query.Scan(&comments).Error; err != nil {
+	// Step 1: find which text prefixes have duplicates
+	type prefixCount struct {
+		TextPrefix string `gorm:"column:text_prefix"`
+		Count      int    `gorm:"column:count"`
+	}
+	var prefixes []prefixCount
+	countQuery := `
+	SELECT SUBSTR(c.text, 1, 30) AS text_prefix, COUNT(*) AS count
+	FROM comment_tables c
+	INNER JOIN video_tables v ON c.video_avid = v.avid
+	WHERE c.text IS NOT NULL AND LENGTH(c.text) >= 10 AND v.topic = ?
+	GROUP BY SUBSTR(c.text, 1, 30)
+	HAVING COUNT(*) > 1
+	ORDER BY count DESC
+	LIMIT ?`
+	if err := r.db.Raw(countQuery, topic, n).Scan(&prefixes).Error; err != nil {
 		return nil, err
 	}
-	return comments, nil
+	if len(prefixes) == 0 {
+		return nil, nil
+	}
+
+	// Step 2: fetch all comments matching those prefixes
+	prefixList := make([]string, len(prefixes))
+	prefixMap := make(map[string]int) // prefix -> count
+	for i, p := range prefixes {
+		prefixList[i] = p.TextPrefix
+		prefixMap[p.TextPrefix] = p.Count
+	}
+
+	var rows []scanRow
+	detailQuery := `
+	SELECT SUBSTR(c.text, 1, 30) AS text_prefix,
+	       c.comment_id, u.name AS username, v.title AS video_title,
+	       v.bvid, c.comment_time AS created_at
+	FROM comment_tables c
+	INNER JOIN video_tables v ON c.video_avid = v.avid
+	INNER JOIN user_tables u ON c.owner = u.uid
+	WHERE c.text IS NOT NULL AND LENGTH(c.text) >= 10 AND v.topic = ?
+	  AND SUBSTR(c.text, 1, 30) IN (?)
+	ORDER BY SUBSTR(c.text, 1, 30), c.comment_time`
+	if err := r.db.Raw(detailQuery, topic, prefixList).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	// Step 3: group by text prefix
+	groupMap := make(map[string]*schema.SimilarCommentGroup)
+	var groupOrder []string
+	for _, row := range rows {
+		g, ok := groupMap[row.TextPrefix]
+		if !ok {
+			g = &schema.SimilarCommentGroup{
+				Text:  row.TextPrefix,
+				Count: prefixMap[row.TextPrefix],
+			}
+			groupMap[row.TextPrefix] = g
+			groupOrder = append(groupOrder, row.TextPrefix)
+		}
+		g.Comments = append(g.Comments, schema.SimilarCommentDetail{
+			CommentId:  row.CommentId,
+			Username:   row.Username,
+			VideoTitle: row.VideoTitle,
+			Bvid:       row.Bvid,
+			CreatedAt:  row.CreatedAt,
+		})
+	}
+
+	groups := make([]schema.SimilarCommentGroup, 0, len(groupOrder))
+	for _, prefix := range groupOrder {
+		groups = append(groups, *groupMap[prefix])
+	}
+	return groups, nil
 }
 
 func (r *TrollQueryRepository) QueryTopNUserInTopic(topic string, n int) ([]schema.UserQuery, error) {
@@ -54,6 +120,48 @@ func (r *TrollQueryRepository) QueryTopNUserInTopic(topic string, n int) ([]sche
 		count DESC
 	LIMIT ?`
 	err := r.db.Raw(query, topic, n).Scan(&ret).Error
+	return ret, err
+}
+
+func (r *TrollQueryRepository) QueryTopNUserInTopics(topics []string, n int) ([]schema.UserQuery, error) {
+	var ret []schema.UserQuery
+	query := `
+	SELECT
+		u.uid, u.name AS username, u.avatar,
+		COUNT(c.comment_id) AS count
+	FROM
+		user_tables u
+		INNER JOIN comment_tables c ON u.uid = c.owner
+		INNER JOIN video_tables v ON c.video_avid = v.avid
+	WHERE`
+
+	if len(topics) == 0 {
+		query += " 1=1"
+		query += `
+	GROUP BY
+		u.uid
+	ORDER BY
+		count DESC
+	LIMIT ?`
+		err := r.db.Raw(query, n).Scan(&ret).Error
+		return ret, err
+	}
+
+	placeholders := make([]string, len(topics))
+	args := make([]interface{}, len(topics))
+	for i, t := range topics {
+		placeholders[i] = "?"
+		args[i] = t
+	}
+	query += fmt.Sprintf(" v.topic IN (%s)", strings.Join(placeholders, ","))
+	query += `
+	GROUP BY
+		u.uid
+	ORDER BY
+		count DESC
+	LIMIT ?`
+	args = append(args, n)
+	err := r.db.Raw(query, args...).Scan(&ret).Error
 	return ret, err
 }
 

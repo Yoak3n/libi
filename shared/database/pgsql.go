@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	_ "time/tzdata"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

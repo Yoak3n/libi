@@ -2,11 +2,14 @@ package tui
 
 import (
 	"fmt"
+	"os/exec"
+	"runtime"
 	"unicode"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/Yoak3n/libi/shared/domain/model/schema"
 	"troll/service"
+
+	"github.com/Yoak3n/libi/shared/domain/model/schema"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -22,6 +25,9 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case topicsLoadedMsg:
 		a.topics = msg
 		a.cursor = 0
+		if a.state == viewTopicSelect {
+			a.topicSelected = make([]bool, len(msg))
+		}
 	case videosLoadedMsg:
 		a.videos = msg
 		a.cursor = 0
@@ -56,6 +62,10 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.cursor = 0
 	case errMsg:
 		a.err = msg
+	case browserOpenedMsg:
+		if msg.err != nil {
+			a.err = fmt.Errorf("open browser: %v", msg.err)
+		}
 	}
 	return a, nil
 }
@@ -152,6 +162,30 @@ func (a *App) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return a, nil
+	}
+
+	// Topic select: space toggles, 'a' selects all
+	if a.state == viewTopicSelect {
+		switch key {
+		case " ":
+			if a.cursor >= 0 && a.cursor < len(a.topicSelected) {
+				a.topicSelected[a.cursor] = !a.topicSelected[a.cursor]
+			}
+			return a, nil
+		case "a":
+			allSelected := true
+			for _, sel := range a.topicSelected {
+				if !sel {
+					allSelected = false
+					break
+				}
+			}
+			v := !allSelected
+			for i := range a.topicSelected {
+				a.topicSelected[i] = v
+			}
+			return a, nil
+		}
 	}
 
 	switch key {
@@ -311,8 +345,31 @@ func (a *App) handleEsc() (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
+func (a *App) openBrowser(url string) tea.Cmd {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return browserOpenedMsg{err: err}
+	})
+}
+
 func (a *App) handleEnter() (tea.Model, tea.Cmd) {
 	switch a.state {
+	case viewUserComments:
+		if a.cursor >= 0 && a.cursor < len(a.flatUserItems) {
+			item := a.flatUserItems[a.cursor]
+			if item.Bvid != "" {
+				url := fmt.Sprintf("https://www.bilibili.com/video/%s#reply%d", item.Bvid, item.CommentId)
+				return a, a.openBrowser(url)
+			}
+		}
 	case viewTopics:
 		if len(a.topics) > 0 && a.cursor < len(a.topics) {
 			a.topicName = a.topics[a.cursor].Name
@@ -325,21 +382,39 @@ func (a *App) handleEnter() (tea.Model, tea.Cmd) {
 			return a, a.loadComments(a.videos[a.cursor].Avid)
 		}
 	case viewTopicSelect:
+		if a.topicSelectFor == "topUsers" {
+			var selected []string
+			for i, sel := range a.topicSelected {
+				if sel && i < len(a.topics) {
+					selected = append(selected, a.topics[i].Name)
+				}
+			}
+			if len(selected) == 0 {
+				return a, nil
+			}
+			a.selectedTopics = selected
+			if len(selected) == 1 {
+				a.topicName = selected[0]
+			} else {
+				a.topicName = "all"
+			}
+			return a, a.loadTopUsers(selected)
+		}
+		// similar: single topic
 		if len(a.topics) > 0 && a.cursor < len(a.topics) {
 			a.topicName = a.topics[a.cursor].Name
-			switch a.topicSelectFor {
-			case "topUsers":
-				return a, a.loadTopUsers(a.topicName)
-			case "similar":
-				return a, a.loadSimilar(a.topicName)
-			}
+			return a, a.loadSimilar(a.topicName)
 		}
 	case viewTopUsers:
 		if len(a.topUsers) > 0 && a.cursor < len(a.topUsers) {
 			u := a.topUsers[a.cursor]
 			a.selectedUser = u.Username
 			a.selectedUID = u.UID
-			return a, a.loadUserComments(u.UID, a.topicName)
+			topic := a.topicName
+			if len(a.selectedTopics) > 1 {
+				topic = "all"
+			}
+			return a, a.loadUserComments(u.UID, topic)
 		}
 	}
 	return a, nil

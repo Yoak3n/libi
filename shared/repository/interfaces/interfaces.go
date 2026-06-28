@@ -86,8 +86,9 @@ type ConfigurationInterface interface {
 
 // TrollQueryInterface provides troll-specific query methods using raw SQL
 type TrollQueryInterface interface {
-	QuerySimilarComments(topic string, n int) ([]schema.SimilarCommentResult, error)
+	QuerySimilarComments(topic string, n int) ([]schema.SimilarCommentGroup, error)
 	QueryTopNUserInTopic(topic string, n int) ([]schema.UserQuery, error)
+	QueryTopNUserInTopics(topics []string, n int) ([]schema.UserQuery, error)
 	GetCommentsByVideo(avid uint) schema.CommentGroupByVideo
 	SearchCommentWithKeyword(keyword string) []schema.CommentData
 	GetVideosByTopic(topic string) []schema.VideoWithCommentCount

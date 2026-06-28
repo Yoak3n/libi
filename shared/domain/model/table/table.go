@@ -27,7 +27,6 @@ type LiveRoomTable struct {
 	Cover         string
 	LongId        int64
 	FollowerCount int64
-	DanMuList     []DanMuTable `gorm:"foreignKey:RoomId;references:RoomId"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	DeletedAt     gorm.DeletedAt `gorm:"index"`
@@ -46,12 +45,7 @@ type UserTable struct {
 	Avatar        string
 	Guard         bool
 	FollowerCount int64
-	HistoryNames  []UserHistoryNameTable `gorm:"foreignKey:UID;references:UID"`
-	Medals        []MedalTable           `gorm:"foreignKey:Owner;references:UID"`
-	DanMuList     []DanMuTable           `gorm:"foreignKey:Sender;references:UID"`
-	Videos        []VideoTable           `gorm:"foreignKey:Owner;references:UID"`
-	Comments      []CommentTable         `gorm:"foreignKey:Owner;references:UID"`
-	LiveRoom      LiveRoomTable          `gorm:"foreignKey:Owner;references:UID"`
+	Medals        []MedalTable `gorm:"foreignKey:Owner;references:UID"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	DeletedAt     gorm.DeletedAt `gorm:"index"`

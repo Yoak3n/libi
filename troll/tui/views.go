@@ -66,13 +66,18 @@ func (a *App) currentHelp() string {
 	case viewComments:
 		return "j/k: navigate • s: sort • a: mark user • esc: back"
 	case viewUserComments:
-		return "j/k: navigate • esc: back"
+		return "j/k: navigate • enter: open comment in browser • esc: back"
 	case viewSignedUsers:
 		return "j/k: navigate • a: add • e: edit description • d: delete • esc: back"
 	case viewAddSignedUser:
 		return "tab: next field • enter: confirm • esc: cancel"
 	case viewEditSignedUser:
 		return "type description • enter: save • esc: cancel"
+	case viewTopicSelect:
+		if a.topicSelectFor == "topUsers" {
+			return "j/k: navigate • space: toggle • a: select all • enter: confirm • esc: back"
+		}
+		return "j/k: navigate • enter: select • esc: back"
 	default:
 		return "j/k: navigate • enter: select • esc: back • q: quit"
 	}
@@ -436,39 +441,76 @@ func (a *App) viewSimilar() string {
 		b.WriteString("  No similar comments found.\n")
 		return b.String()
 	}
-	start := 0
-	maxVisible := a.height - 6
+
+	// Build display lines: each group = 1 header + N member lines
+	type simLine struct {
+		groupIdx int
+		isHeader bool
+		text     string
+	}
+	var lines []simLine
+	for i, g := range a.similarComments {
+		text := g.Text
+		if len([]rune(text)) > 60 {
+			text = string([]rune(text)[:60]) + "..."
+		}
+		lines = append(lines, simLine{
+			groupIdx: i,
+			isHeader: true,
+			text:     fmt.Sprintf("%s %s", text, CountStyle.Render(fmt.Sprintf("(x%d)", g.Count))),
+		})
+		for _, c := range g.Comments {
+			ts := ""
+			if !c.CreatedAt.IsZero() {
+				ts = " " + c.CreatedAt.Format("01-02 15:04")
+			}
+			lines = append(lines, simLine{
+				groupIdx: i,
+				isHeader: false,
+				text:     fmt.Sprintf("[%s] %s%s", c.Username, c.VideoTitle, ts),
+			})
+		}
+	}
+
+	// Find which line the cursor group's header is on
+	cursorLine := 0
+	for i, l := range lines {
+		if l.groupIdx == a.cursor && l.isHeader {
+			cursorLine = i
+			break
+		}
+	}
+
+	maxVisible := a.height - 4
 	if maxVisible < 1 {
 		maxVisible = 1
 	}
-	if a.cursor >= maxVisible {
-		start = a.cursor - maxVisible + 1
+	start := 0
+	if cursorLine >= maxVisible {
+		start = cursorLine - maxVisible + 1
 	}
 	end := start + maxVisible
-	if end > len(a.similarComments) {
-		end = len(a.similarComments)
+	if end > len(lines) {
+		end = len(lines)
 	}
+
 	for i := start; i < end; i++ {
-		s := a.similarComments[i]
-		cursor := "  "
-		if i == a.cursor {
-			cursor = "> "
-		}
-		text := s.Text
-		if len(text) > 80 {
-			text = text[:80] + "..."
-		}
-		count := CountStyle.Render(fmt.Sprintf("(x%d)", s.Count))
-		line := fmt.Sprintf("%s%s %s", cursor, text, count)
-		if i == a.cursor {
-			b.WriteString(SelectedItemStyle.Render(line))
+		l := lines[i]
+		if l.isHeader {
+			cursor := "  "
+			if l.groupIdx == a.cursor {
+				cursor = "> "
+			}
+			line := fmt.Sprintf("%s%s", cursor, l.text)
+			if l.groupIdx == a.cursor {
+				b.WriteString(SelectedItemStyle.Render(line))
+			} else {
+				b.WriteString(NormalItemStyle.Render(line))
+			}
 		} else {
-			b.WriteString(NormalItemStyle.Render(line))
+			b.WriteString(StatusStyle.Render("    " + l.text))
 		}
 		b.WriteString("\n")
-	}
-	if len(a.similarComments) > maxVisible {
-		b.WriteString(StatusStyle.Render(fmt.Sprintf("  Showing %d-%d of %d", start+1, end, len(a.similarComments))))
 	}
 	return b.String()
 }
@@ -485,17 +527,39 @@ func (a *App) viewTopicSelect() string {
 		b.WriteString("  No topics found.\n")
 		return b.String()
 	}
+	isMulti := a.topicSelectFor == "topUsers"
+	allSelected := isMulti
+	if isMulti {
+		for _, sel := range a.topicSelected {
+			if !sel {
+				allSelected = false
+				break
+			}
+		}
+	}
 	for i, t := range a.topics {
 		cursor := "  "
 		if i == a.cursor {
 			cursor = "> "
 		}
-		line := fmt.Sprintf("%s%s %s", cursor, t.Name, CountStyle.Render(fmt.Sprintf("(%d videos)", t.Count)))
+		check := ""
+		if isMulti {
+			mark := " "
+			if i < len(a.topicSelected) && a.topicSelected[i] {
+				mark = "x"
+			}
+			check = fmt.Sprintf("[%s] ", mark)
+		}
+		line := fmt.Sprintf("%s%s%s %s", cursor, check, t.Name, CountStyle.Render(fmt.Sprintf("(%d videos)", t.Count)))
 		if i == a.cursor {
 			b.WriteString(SelectedItemStyle.Render(line))
 		} else {
 			b.WriteString(NormalItemStyle.Render(line))
 		}
+		b.WriteString("\n")
+	}
+	if isMulti && allSelected {
+		b.WriteString(StatusStyle.Render("  (all selected)"))
 		b.WriteString("\n")
 	}
 	return b.String()

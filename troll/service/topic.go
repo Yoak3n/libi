@@ -15,21 +15,26 @@ import (
 )
 
 type Topic struct {
-	Name    string
-	KeyWord []string
-	Videos  []model.VideoData
-	cache   string
-	wg      sync.WaitGroup
-	jobs    chan model.VideoData
+	Name     string
+	KeyWord  []string
+	Videos   []model.VideoData
+	cache    string
+	maxPages int
+	wg       sync.WaitGroup
+	jobs     chan model.VideoData
 }
 
-func NewTopic(cache, name string, keywords []string) *Topic {
+func NewTopic(cache, name string, keywords []string, maxPages int) *Topic {
+	if maxPages <= 0 {
+		maxPages = 1
+	}
 	now := time.Now()
 	t := &Topic{
-		Name:    name,
-		KeyWord: keywords,
-		cache:   cache,
-		jobs:    make(chan model.VideoData, 10),
+		Name:     name,
+		KeyWord:  keywords,
+		cache:    cache,
+		maxPages: maxPages,
+		jobs:     make(chan model.VideoData, 10),
 	}
 	t.fetchVideos()
 	log.Printf("%s cost %vmin", t.Name, time.Since(now).Minutes())
@@ -43,17 +48,36 @@ func (t *Topic) fetchVideos() {
 		sb.WriteByte(',')
 		sb.WriteString(t.KeyWord[i])
 	}
-	videos := SearchVideoOfTopic(sb.String(), 1)
-	if videos == nil {
+	keyword := sb.String()
+
+	// Fetch all pages of search results
+	var allVideos []model.VideoData
+	seen := make(map[uint]bool)
+	for page := 1; page <= t.maxPages; page++ {
+		videos := SearchVideoOfTopic(keyword, page)
+		if len(videos) == 0 {
+			break
+		}
+		for _, v := range videos {
+			if !seen[v.Avid] {
+				seen[v.Avid] = true
+				allVideos = append(allVideos, v)
+			}
+		}
+		log.Printf("Page %d: found %d videos (%d total unique)", page, len(videos), len(allVideos))
+	}
+	if len(allVideos) == 0 {
 		return
 	}
 
+	tracker := NewProgressTracker()
 	for i := 1; i <= 2; i++ {
+		tracker.RegisterWorker(i)
 		t.wg.Add(1)
-		go t.worker(i)
+		go t.worker(i, tracker)
 	}
 	go func() {
-		for _, v := range videos {
+		for _, v := range allVideos {
 			t.jobs <- v
 		}
 		close(t.jobs)
@@ -61,11 +85,9 @@ func (t *Topic) fetchVideos() {
 	t.wg.Wait()
 }
 
-func (t *Topic) worker(id int) {
+func (t *Topic) worker(id int, tracker *ProgressTracker) {
 	defer t.wg.Done()
 	for v := range t.jobs {
-		log.Printf("Worker %d fetching video: %s", id, v.Title)
-		start := time.Now()
 		videoData := &model.VideoData{
 			Avid:        v.Avid,
 			Bvid:        v.Bvid,
@@ -74,7 +96,7 @@ func (t *Topic) worker(id int) {
 			Description: v.Description,
 			Owner:       v.Owner,
 		}
-		videoData.Comments = LazilyGetAllComments(v.Avid, v.Review)
+		videoData.Comments = LazilyGetAllComments(v.Avid, v.Review, tracker, id, v.Title)
 
 		videoRecord := &table.VideoTable{
 			Avid:        v.Avid,
@@ -91,7 +113,6 @@ func (t *Topic) worker(id int) {
 		if t.cache != "" {
 			t.saveCache(videoData)
 		}
-		log.Printf("Worker %d completed: %s (%v)", id, v.Title, time.Since(start).Round(time.Second))
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"github.com/Yoak3n/libi/shared/domain/model/schema"
 	"github.com/Yoak3n/libi/shared/domain/model/table"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type UserEntryRepository struct {
@@ -24,7 +25,7 @@ func (r *UserEntryRepository) CreateEntry(entry *schema.UserEntry) error {
 }
 
 func (r *UserEntryRepository) CreateEntryBatch(entries []*table.UserEntryTable) error {
-	return r.db.Create(&entries).Error
+	return r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&entries).Error
 }
 
 func (r *UserEntryRepository) ReadEntriesByRoom(roomId uint, limit int) ([]*schema.UserEntry, error) {

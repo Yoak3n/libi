@@ -28,7 +28,6 @@ type (
 		LastUpdate int64          `yaml:"last_update"`
 	}
 	AccountEntry struct {
-		UID          uint   `yaml:"uid,omitempty"`
 		Cookie       string `yaml:"cookie"`
 		RefreshToken string `yaml:"refresh_token,omitempty"`
 	}
@@ -38,7 +37,7 @@ type (
 		Port     int    `yaml:"port"`
 		User     string `yaml:"user"`
 		Password string `yaml:"password"`
-		Name     string `yaml:"database"`
+		Name     string `yaml:"name"`
 	}
 )
 
@@ -59,6 +58,7 @@ func init() {
 		Auth:     &Auth{},
 		Database: &Database{},
 	}
+	v.SetConfigName("config")
 	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
 	err := v.ReadInConfig()
@@ -114,7 +114,7 @@ func loadAccountsFromYAML() {
 		Conf.Auth.Accounts = raw.Auth.Accounts
 	} else if raw.Auth.Cookie != "" {
 		Conf.Auth.Accounts = []AccountEntry{
-			{UID: ExtractUID(raw.Auth.Cookie), Cookie: raw.Auth.Cookie, RefreshToken: raw.Auth.RefreshToken},
+			{Cookie: raw.Auth.Cookie, RefreshToken: raw.Auth.RefreshToken},
 		}
 	}
 }
@@ -144,20 +144,27 @@ func (a *Auth) SetPrimary(cookie, refreshToken string) {
 	a.Accounts[0].RefreshToken = refreshToken
 }
 
-// AddAccount appends a new account. UID is extracted from cookie if not provided.
+// AddAccount adds or updates an account. If an account with the same UID (from DedeUserID) already
+// exists, it is updated in place; otherwise the new account is appended.
 func (a *Auth) AddAccount(cookie, refreshToken string) {
-	entry := AccountEntry{
+	uid := ExtractUID(cookie)
+	if uid != 0 {
+		if i := a.FindByUID(uid); i >= 0 {
+			a.Accounts[i].Cookie = cookie
+			a.Accounts[i].RefreshToken = refreshToken
+			return
+		}
+	}
+	a.Accounts = append(a.Accounts, AccountEntry{
 		Cookie:       cookie,
 		RefreshToken: refreshToken,
-	}
-	entry.UID = ExtractUID(cookie)
-	a.Accounts = append(a.Accounts, entry)
+	})
 }
 
-// FindByUID returns the index of the account with the given UID, or -1.
+// FindByUID returns the index of the account whose cookie contains the given UID, or -1.
 func (a *Auth) FindByUID(uid uint) int {
 	for i, acc := range a.Accounts {
-		if acc.UID == uid {
+		if ExtractUID(acc.Cookie) == uid {
 			return i
 		}
 	}

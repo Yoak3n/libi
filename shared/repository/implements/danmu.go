@@ -3,6 +3,7 @@ package implements
 import (
 	"github.com/Yoak3n/libi/shared/domain/model/table"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type DanMuRepository struct {
@@ -14,7 +15,7 @@ func NewDanMuRepository(db *gorm.DB) *DanMuRepository {
 }
 
 func (r *DanMuRepository) CreateDanMuBatch(danmus []*table.DanMuTable) error {
-	return r.db.Create(&danmus).Error
+	return r.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&danmus).Error
 }
 
 func (r *DanMuRepository) ReadDanMuByRoom(roomId uint, limit int) ([]*table.DanMuTable, error) {
