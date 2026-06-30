@@ -13,6 +13,7 @@ type VideoTable struct {
 	Cover       string
 	Topic       string
 	Description string `json:"description"`
+	Tags        string `json:"tags"`
 	Owner       uint   `json:"owner" gorm:"index"`
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
@@ -72,18 +73,18 @@ type MedalTable struct {
 type DanMuTable struct {
 	MessageId string `gorm:"primaryKey"`
 	Content   string
-	RoomId    uint  `gorm:"index:idx_room_created,priority:1"`
+	RoomId    uint `gorm:"index:idx_room_created,priority:1"`
 	Type      int8
-	Sender    uint `gorm:"index:idx_sender_created,priority:1"`
+	Sender    uint      `gorm:"index:idx_sender_created,priority:1"`
 	CreatedAt time.Time `gorm:"index:idx_room_created,priority:2;index:idx_sender_created,priority:2"`
 	UpdatedAt time.Time
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
 type UserEntryTable struct {
-	ID        uint `gorm:"primaryKey;autoIncrement"`
-	UID       uint `gorm:"index:idx_uid_entered,priority:1"`
-	RoomId    uint `gorm:"index:idx_room_entered,priority:1"`
+	ID        uint      `gorm:"primaryKey;autoIncrement"`
+	UID       uint      `gorm:"index:idx_uid_entered,priority:1"`
+	RoomId    uint      `gorm:"index:idx_room_entered,priority:1"`
 	EnteredAt time.Time `gorm:"index:idx_uid_entered,priority:2;index:idx_room_entered,priority:2"`
 }
 
@@ -100,9 +101,9 @@ type CommentTable struct {
 	Owner         uint   `gorm:"index"`
 	VideoAvid     uint   `gorm:"index:idx_avid_created,priority:1"`
 	ParentComment uint
-	CommentId     uint   `gorm:"primaryKey"`
+	CommentId     uint `gorm:"primaryKey"`
 	Like          uint64
-	CommentTime   time.Time      `gorm:"column:comment_time;index:idx_avid_created,priority:2"`
+	CommentTime   time.Time `gorm:"column:comment_time;index:idx_avid_created,priority:2"`
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	DeletedAt     gorm.DeletedAt `gorm:"index"`

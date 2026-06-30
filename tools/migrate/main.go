@@ -159,6 +159,7 @@ func sanitize(model interface{}) {
 			(*rows)[i].Topic = cleanStr((*rows)[i].Topic)
 			(*rows)[i].Description = cleanStr((*rows)[i].Description)
 			(*rows)[i].Bvid = cleanStr((*rows)[i].Bvid)
+			(*rows)[i].Tags = cleanStr((*rows)[i].Tags)
 		}
 	case *[]table.LiveRoomTable:
 		for i := range *rows {

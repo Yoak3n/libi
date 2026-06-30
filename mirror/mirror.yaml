@@ -1,0 +1,67 @@
+# mirror 配置文件
+# 不读写 config.yaml（那是 troll/shared 的文件），两者互不冲突。
+#
+# LLM API Key 不写在此文件中，从环境变量读取：
+#   export OPENAI_API_KEY=sk-...
+#   export ANTHROPIC_API_KEY=sk-ant-...
+#   或通用: export MIRROR_LLM_API_KEY=...
+
+# 工作目录（数据输出路径）
+work_dir: data
+
+# Troll 引用（可选）
+# 设置后 mirror 可复用 troll 的 cookie 和数据库配置
+# troll:
+#   config_path: ../troll/config.yaml
+#   data_dir: ../troll/data
+
+# LLM 配置
+llm:
+  provider: mimo # openai | anthropic | local
+  model: mimo-v2.5 # 模型名
+  base_url: "https://api.xiaomimimo.com/v1" # 可选：自定义 API 地址（如 https://api.openai.com/v1）
+  timeout: 60 # 请求超时秒数
+
+# Agent 调度配置
+agent:
+  max_retries: 3 # 单个 Agent 最大重试次数
+  parallel_count: 5 # 并行 Agent 数量
+  timeout_sec: 120 # Agent 超时秒数
+
+# 社区定义（可选，仅作为名称/别名校验参考）
+# 实际数据存储在数据库中，通过 mirror init 填充
+communities:
+  - name: 原神
+    aliases: [genshin, 原, op, gp]
+    tags: [米哈游, 开放世界]
+    weight: 10
+  - name: 星穹铁道
+    aliases: [崩铁, 星铁, hsr, star rail]
+    tags: [米哈游, 回合制]
+    weight: 9
+  - name: 绝区零
+    aliases: [zzz, 绝区, zenless]
+    tags: [米哈游, 动作]
+    weight: 8
+  - name: 鸣潮
+    aliases: [潮, ww, wuwa, mc]
+    tags: [库洛, 开放世界, 动作]
+    weight: 8
+  - name: 明日方舟
+    aliases: [方舟, arknights, 粥, 蟑螂, zp, 利刃, 鹰, 🦅]
+    tags: [鹰角, 塔防]
+    weight: 7
+  - name: 终末地
+    aliases: [粥, 蟑螂, zp, 利刃, 鹰, 🦅, 终末地,小麦地,终, 基建],
+    tags: [基建]
+    weight: 8
+  - name: 异环
+    aliases: [环, 环卫工]
+    tags: [完美, 开放世界, 都市]
+    weight: 8
+
+
+
+# 分析阈值
+community_confidence_threshold: 0.6 # 社区归属置信度阈值，低于此值不纳入统计
+max_comments_per_video: 0 # 单视频最大分析评论数（0=不限）

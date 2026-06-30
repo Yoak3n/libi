@@ -80,18 +80,18 @@ func LazilyGetAllComments(avid uint, total int, tracker *ProgressTracker, worker
 // A single display goroutine renders all active workers atomically, avoiding interleaving
 // with other terminal output (e.g. log.Printf).
 type ProgressTracker struct {
-	mu         sync.Mutex
-	workers    map[int]*progressWorker
-	lineWidth  int // length of last rendered line, used to pad/overwrite
+	mu        sync.Mutex
+	workers   map[int]*progressWorker
+	lineWidth int // length of last rendered line, used to pad/overwrite
 }
 
 type progressWorker struct {
-	counter *atomic.Int64
-	total   int
-	title   string
-	start   time.Time
-	done    chan struct{}
-	elapsed time.Duration // set when worker finishes
+	counter  *atomic.Int64
+	total    int
+	title    string
+	start    time.Time
+	done     chan struct{}
+	elapsed  time.Duration // set when worker finishes
 	finished bool
 }
 
@@ -401,9 +401,9 @@ func SearchVideoOfTopic(keyword string, page int) []model.VideoData {
 }
 
 func FetchVideoInfo(bvid string, topic string) *model.VideoData {
-	const VideoInfoUrl = "https://api.bilibili.com/x/web-interface/wbi/view"
+	const VideoDetailUrl = "https://api.bilibili.com/x/web-interface/wbi/view/detail"
 	params := map[string]string{"bvid": bvid}
-	addr := util.AppendParamsToUrl(VideoInfoUrl, params)
+	addr := util.AppendParamsToUrl(VideoDetailUrl, params)
 
 	var resBuf []byte
 	if err := dispatcher.Dispatch(func(cookie string) error {
@@ -416,11 +416,23 @@ func FetchVideoInfo(bvid string, topic string) *model.VideoData {
 		return nil
 	}
 
-	response := model.VideoInfoResponse{}
-	if err := json.Unmarshal(resBuf, &response); err != nil || response.Code != 0 {
+	resp := model.VideoDetailResponse{}
+	if err := json.Unmarshal(resBuf, &resp); err != nil || resp.Code != 0 {
 		return nil
 	}
-	v := response.Data
+
+	v := resp.Data.View
+	tags := ""
+	if len(resp.Data.Tags) > 0 {
+		names := make([]string, 0, len(resp.Data.Tags))
+		for _, t := range resp.Data.Tags {
+			if t.TagName != "" {
+				names = append(names, t.TagName)
+			}
+		}
+		tags = strings.Join(names, ", ")
+	}
+
 	ret := &model.VideoData{
 		Avid:        v.Aid,
 		Bvid:        v.Bvid,
@@ -429,10 +441,12 @@ func FetchVideoInfo(bvid string, topic string) *model.VideoData {
 		Description: v.Description,
 		Owner:       model.UserData{Uid: v.Owner.Mid, Name: v.Owner.Name},
 		Review:      int(v.Stat.Reply),
+		Tags:        tags,
 	}
 	videoRecord := &table.VideoTable{
 		Avid: ret.Avid, Title: ret.Title, Bvid: ret.Bvid,
 		Description: ret.Description, Owner: ret.Owner.Uid, Topic: topic,
+		Tags: tags,
 	}
 	VideoRepo.CreateVideo(videoRecord)
 	AddUserByUid(ret.Owner.Uid)

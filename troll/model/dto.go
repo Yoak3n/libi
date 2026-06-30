@@ -14,6 +14,7 @@ type VideoData struct {
 	Title       string        `json:"title"`
 	Cover       string        `json:"cover"`
 	Description string        `json:"description"`
+	Tags        string        `json:"tags"`
 	Owner       UserData      `json:"owner"`
 	Comments    []CommentData `json:"comments"`
 	Review      int           `json:"review"`
@@ -27,7 +28,7 @@ type CommentData struct {
 	Oid        uint          `json:"oid"`
 	Like       uint64        `json:"like"`
 	NeedExpand bool
-	CreatedAt  time.Time     `json:"created_at"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type UserData struct {

@@ -154,3 +154,22 @@ type UserResponse struct {
 		Sex  string `json:"sex"`
 	} `json:"data"`
 }
+
+// Video detail API response (combines video info + tags in one call)
+
+type VideoDetailResponse struct {
+	Code    int             `json:"code"`
+	Message string          `json:"message"`
+	Data    VideoDetailData `json:"data"`
+}
+
+type VideoDetailData struct {
+	View VideoInfoData `json:"View"`
+	Tags []TagItem     `json:"Tags"`
+}
+
+type TagItem struct {
+	TagID   int    `json:"tag_id"`
+	TagName string `json:"tag_name"`
+	TagType string `json:"tag_type"`
+}
