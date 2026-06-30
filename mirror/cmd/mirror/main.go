@@ -90,7 +90,7 @@ func analyzeCommand() *cli.Command {
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			fmt.Println("🔬 Starting analysis...")
 			if !mirrorconfig.HasValidLLM() {
-				fmt.Println("  ⚠  LLM not configured. Set OPENAI_API_KEY or ANTHROPIC_API_KEY.")
+				fmt.Println("  ⚠  LLM not configured. Set MIRROR_LLM_API_KEY.")
 				return nil
 			}
 			fmt.Printf("  ✓  LLM configured: %s (%s)\n",

@@ -156,13 +156,6 @@ func ResolveAPIKey() string {
 	if Conf == nil {
 		return ""
 	}
-	// 全量尝试，不依赖 provider 值
-	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
-		return key
-	}
-	if key := os.Getenv("ANTHROPIC_API_KEY"); key != "" {
-		return key
-	}
 	if key := os.Getenv("MIRROR_LLM_API_KEY"); key != "" {
 		return key
 	}

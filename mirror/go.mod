@@ -1,7 +1,6 @@
 module mirror
 
-go 1.26.4
-
+go 1.25.3
 require (
 	github.com/Yoak3n/gulu v0.0.6 // indirect
 	github.com/Yoak3n/libi/shared v0.0.0

@@ -29,7 +29,7 @@ agent:
   timeout_sec: 120 # Agent 超时秒数
 
 # 社区定义（可选，仅作为名称/别名校验参考）
-# 实际数据存储在数据库中，通过 mirror init 填充
+# 实际数据存储在json微博文件中
 communities:
   - name: 原神
     aliases: [genshin, 原, op, gp]
@@ -44,7 +44,7 @@ communities:
     tags: [米哈游, 动作]
     weight: 8
   - name: 鸣潮
-    aliases: [潮, ww, wuwa, mc]
+    aliases: [鸣, 潮, wuwa, mc]
     tags: [库洛, 开放世界, 动作]
     weight: 8
   - name: 明日方舟
@@ -56,7 +56,7 @@ communities:
     tags: [基建]
     weight: 8
   - name: 异环
-    aliases: [环, 环卫工]
+    aliases: [环, 环卫工, 环官]
     tags: [完美, 开放世界, 都市]
     weight: 8
 
