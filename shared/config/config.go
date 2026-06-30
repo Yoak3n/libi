@@ -103,7 +103,7 @@ func loadAccountsFromYAML() {
 		Auth struct {
 			Accounts []AccountEntry `yaml:"accounts"`
 			// Legacy single-cookie format
-			Cookie      string `yaml:"cookie"`
+			Cookie       string `yaml:"cookie"`
 			RefreshToken string `yaml:"refresh_token"`
 		} `yaml:"auth"`
 	}
@@ -261,6 +261,9 @@ func SaveAuth() {
 	data, _ := os.ReadFile(configFile)
 	var raw map[string]interface{}
 	_ = yaml.Unmarshal(data, &raw)
+	if raw == nil {
+		raw = make(map[string]interface{})
+	}
 
 	// Build auth section
 	authMap := map[string]interface{}{
